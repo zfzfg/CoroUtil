@@ -1,128 +1,101 @@
 package com.corosus.coroutil.loader.fabric;
 
 import com.corosus.coroutil.util.CULog;
-import com.corosus.modconfig.*;
-import fuzs.forgeconfigapiport.fabric.api.forge.v4.ForgeConfigRegistry;
-import net.minecraftforge.common.ForgeConfigSpec;
-import net.minecraftforge.fml.config.ModConfig;
+import com.corosus.modconfig.ConfigComment;
+import com.corosus.modconfig.ConfigParams;
+import com.corosus.modconfig.CoroConfigRegistry;
+import com.corosus.modconfig.IConfigCategory;
+import com.corosus.modconfig.ModConfigData;
+import com.electronwill.nightconfig.core.CommentedConfig;
+import com.electronwill.nightconfig.core.file.CommentedFileConfig;
+import com.electronwill.nightconfig.core.io.WritingMode;
+import net.fabricmc.loader.api.FabricLoader;
 
 import java.lang.reflect.Field;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashMap;
 
+/** Fabric TOML backend. Keeps the same general.<field> layout used by Forge config files. */
 public class ModConfigDataFabric extends ModConfigData {
 
-    public HashMap<String, ForgeConfigSpec.ConfigValue<String>> valsStringConfig = new HashMap<>();
-    public HashMap<String, ForgeConfigSpec.ConfigValue<Integer>> valsIntegerConfig = new HashMap<>();
-    public HashMap<String, ForgeConfigSpec.ConfigValue<Double>> valsDoubleConfig = new HashMap<>();
-    public HashMap<String, ForgeConfigSpec.ConfigValue<Boolean>> valsBooleanConfig = new HashMap<>();
+    private final HashMap<String, Object> values = new HashMap<>();
+    private Path configFile;
 
     public ModConfigDataFabric(String savePath, String parStr, Class parClass, IConfigCategory parConfig) {
         super(savePath, parStr, parClass, parConfig);
     }
 
     @Override
-    public String getConfigString(String fieldName) {
-        return valsStringConfig.get(fieldName).get();
-    }
-
-    @Override
-    public Integer getConfigInteger(String fieldName) {
-        return valsIntegerConfig.get(fieldName).get();
-    }
-
-    @Override
-    public Double getConfigDouble(String fieldName) {
-        return valsDoubleConfig.get(fieldName).get();
-    }
-
-    @Override
-    public Boolean getConfigBoolean(String fieldName) {
-        return valsBooleanConfig.get(fieldName).get();
-    }
-
-    @Override
-    public <T> void setConfig(String fieldName, T obj) {
-        if (obj instanceof String) {
-            valsStringConfig.get(fieldName).set((String)obj);
-            valsStringConfig.get(fieldName).save();
-        } else if (obj instanceof Integer) {
-            valsIntegerConfig.get(fieldName).set((Integer)obj);
-            valsIntegerConfig.get(fieldName).save();
-        } else if (obj instanceof Double) {
-            valsDoubleConfig.get(fieldName).set((Double)obj);
-            valsDoubleConfig.get(fieldName).save();
-        } else if (obj instanceof Boolean) {
-            valsBooleanConfig.get(fieldName).set((Boolean)obj);
-            valsBooleanConfig.get(fieldName).save();
-        } else {
-            //dbg("unhandled datatype, update initField");
+    public synchronized void writeConfigFile(boolean resetConfig) {
+        try {
+            configFile = FabricLoader.getInstance().getConfigDir().resolve(saveFilePath + ".toml");
+            Files.createDirectories(configFile.getParent());
+            try (CommentedFileConfig config = CommentedFileConfig.builder(configFile)
+                    .preserveInsertionOrder()
+                    .sync()
+                    .writingMode(WritingMode.REPLACE)
+                    .build()) {
+                config.load();
+                CommentedConfig general = config.getOrElse("general", CommentedConfig::inMemory);
+                for (Field field : configClass.getDeclaredFields()) {
+                    String name = field.getName();
+                    Object defaultValue = CoroConfigRegistry.instance().getField(configID, name);
+                    if (!(defaultValue instanceof String || defaultValue instanceof Integer || defaultValue instanceof Double || defaultValue instanceof Boolean)) continue;
+                    String comment = "-";
+                    ConfigComment configComment = field.getAnnotation(ConfigComment.class);
+                    if (configComment != null && configComment.value().length > 0) comment = configComment.value()[0];
+                    ConfigParams params = field.getAnnotation(ConfigParams.class);
+                    if (params != null) comment = params.comment();
+                    Object value = general.contains(name) ? general.get(name) : defaultValue;
+                    value = normalizeAndClamp(value, defaultValue, params);
+                    general.set(name, value);
+                    general.setComment(name, comment);
+                    values.put(name, value);
+                    setFieldBasedOnType(name, value);
+                }
+                config.set("general", general);
+                config.save();
+            }
+            CULog.dbg("writeConfigFile invoked for " + configID + ", resetConfig: " + resetConfig);
+        } catch (Exception exception) {
+            throw new RuntimeException("Could not read or save CoroUtil config " + saveFilePath, exception);
         }
     }
 
-    @Override
-    public void writeConfigFile(boolean resetConfig) {
-
-        //TODO: see if we need support for resetting config
-        //if (resetConfig) if (saveFilePath.exists()) saveFilePath.delete();
-        //preInitConfig = new Configuration(saveFilePath);
-        //preInitConfig.load();
-        ForgeConfigSpec.Builder BUILDER = new ForgeConfigSpec.Builder();
-        BUILDER.comment("General mod settings").push("general");
-
-        Field[] fields = configClass.getDeclaredFields();
-
-        for (int i = 0; i < fields.length; i++) {
-            Field field = fields[i];
-            String name = field.getName();
-
-            addToConfig(BUILDER, field, name);
+    private Object normalizeAndClamp(Object value, Object defaultValue, ConfigParams params) {
+        if (defaultValue instanceof String) return value instanceof String ? value : defaultValue;
+        if (defaultValue instanceof Boolean) return value instanceof Boolean ? value : defaultValue;
+        try {
+            double number = value instanceof Number ? ((Number) value).doubleValue() : Double.parseDouble(String.valueOf(value));
+            double min = params == null ? -Double.MAX_VALUE : params.min();
+            double max = params == null ? Double.MAX_VALUE : params.max();
+            number = Math.max(min, Math.min(max, number));
+            if (defaultValue instanceof Integer) return (int) number;
+            return number;
+        } catch (RuntimeException exception) {
+            return defaultValue;
         }
-
-        CULog.dbg("writeConfigFile invoked for " + this.configID + ", resetConfig: " + resetConfig);
-        BUILDER.pop();
-        ForgeConfigSpec CONFIG = BUILDER.build();
-        ForgeConfigRegistry.INSTANCE.register(ConfigMod.instance().MODID, ModConfig.Type.COMMON, CONFIG, saveFilePath + ".toml");
     }
 
-    /**
-     * Perform the actual adding of values to the config file
-     * @param name Name of the variable
-     * @param field Field in the file the variable is
-     */
-    private void addToConfig(ForgeConfigSpec.Builder builder, Field field, String name) {
-
-        // Comment from the annotation on the value of the actual variable that 'name' is retrieved from
-        //space intentional here to workaround forge hating blank comments
-        String comment = "-";
-        double min = Double.MIN_VALUE;
-        double max = Double.MAX_VALUE;
-
-        ConfigComment anno_comment = field.getAnnotation(ConfigComment.class);
-        if (anno_comment != null) {
-            comment = anno_comment.value()[0];
+    private synchronized void save(String fieldName, Object value) {
+        if (configFile == null) return;
+        try (CommentedFileConfig config = CommentedFileConfig.builder(configFile).sync().build()) {
+            config.load();
+            CommentedConfig general = config.get("general");
+            if (general == null) {
+                general = CommentedConfig.inMemory();
+                config.set("general", general);
+            }
+            general.set(fieldName, value);
+            config.save();
+            values.put(fieldName, value);
         }
-
-        ConfigParams anno_params = field.getAnnotation(ConfigParams.class);
-        if (anno_params != null) {
-            comment = anno_params.comment();
-            min = anno_params.min();
-            max = anno_params.max();
-        }
-
-        //System.out.println("registering config field: " + name);
-
-        Object obj = CoroConfigRegistry.instance().getField(configID, name);
-        if (obj instanceof String) {
-            valsStringConfig.put(name, builder.comment(comment).define(name, (String)obj));
-        } else if (obj instanceof Integer) {
-            valsIntegerConfig.put(name, builder.comment(comment).defineInRange(name, (Integer)obj, (int)min, (int)max));
-        } else if (obj instanceof Double) {
-            valsDoubleConfig.put(name, builder.comment(comment).defineInRange(name, (Double)obj, min, max));
-        } else if (obj instanceof Boolean) {
-            valsBooleanConfig.put(name, builder.comment(comment).define(name, (Boolean)obj));
-        } else {
-            //dbg("unhandled datatype, update initField");
-        }
-        setFieldBasedOnType(name, obj);
     }
+
+    @Override public String getConfigString(String name) { return (String) values.get(name); }
+    @Override public Integer getConfigInteger(String name) { return (Integer) values.get(name); }
+    @Override public Double getConfigDouble(String name) { return (Double) values.get(name); }
+    @Override public Boolean getConfigBoolean(String name) { return (Boolean) values.get(name); }
+    @Override public <T> void setConfig(String name, T value) { save(name, value); }
 }

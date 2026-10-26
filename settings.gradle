@@ -25,3 +25,5 @@ pluginManagement {
 plugins {
     id 'org.gradle.toolchains.foojay-resolver-convention' version '0.8.0'
 }
+rootProject.name = 'coroutil'
+rootProject.buildFileName = gradle.startParameter.projectProperties.getOrDefault('loader', 'neoforge') == 'fabric' ? 'build_fabric.gradle' : 'build_neoforge.gradle'

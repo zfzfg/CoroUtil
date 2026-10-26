@@ -15,7 +15,7 @@ public class ChunkCoordinatesBlock extends BlockPos {
 	
 	public ChunkCoordinatesBlock(BlockPos par1BlockCoord, Block parBlockID)
 	{
-        super(par1BlockCoord);
+        super(par1BlockCoord.getX(), par1BlockCoord.getY(), par1BlockCoord.getZ());
         block = parBlockID;
     }
 }

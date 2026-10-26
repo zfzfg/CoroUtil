@@ -27,7 +27,7 @@ public class ConfigModNeoForge extends ConfigMod {
         NeoForge.EVENT_BUS.addListener(this::onServerStarting);
         NeoForge.EVENT_BUS.addListener(this::registerCommands);
 
-        if (FMLEnvironment.dist.isClient()) {
+        if (FMLEnvironment.getDist().isClient()) {
             ClientEvents clientEvents = new ClientEvents();
             NeoForge.EVENT_BUS.addListener(clientEvents::onRegisterCommandsClient);
             NeoForge.EVENT_BUS.addListener(clientEvents::onGameTick);
@@ -58,7 +58,7 @@ public class ConfigModNeoForge extends ConfigMod {
         if (side.equals("client")) {
             ConfigTracker.INSTANCE.loadConfigs(ModConfig.Type.CLIENT, ConfigMod.instance().getConfigPath());
         } else if (side.equals("common")) {
-            ConfigTracker.INSTANCE.loadConfigs(ModConfig.Type.COMMON, ConfigMod.instance().getConfigPath());
+            ConfigTracker.INSTANCE.loadConfigs(ModConfig.Type.SYNCED, ConfigMod.instance().getConfigPath());
         }
     }
 

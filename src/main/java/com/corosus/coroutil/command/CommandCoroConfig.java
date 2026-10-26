@@ -10,6 +10,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.ArgumentBuilder;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.server.permissions.Permissions;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.Component;
 
@@ -22,7 +23,7 @@ import static net.minecraft.commands.Commands.literal;
 public class CommandCoroConfig {
 	public static void register(final CommandDispatcher<CommandSourceStack> dispatcher) {
 		dispatcher.register(
-			Commands.literal(getCommandName()).requires(s -> s.hasPermission(2))
+			Commands.literal(getCommandName()).requires(s -> s.permissions().hasPermission(Permissions.COMMANDS_ADMIN))
 			.then(literal("config")
 				.then(literal("common")
 					.then(argumentReload("common"))

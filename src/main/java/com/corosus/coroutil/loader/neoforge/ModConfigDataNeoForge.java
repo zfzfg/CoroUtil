@@ -4,7 +4,6 @@ import com.corosus.coroutil.util.CULog;
 import com.corosus.modconfig.*;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.neoforge.common.ModConfigSpec;
-import net.neoforged.neoforge.common.NeoForgeConfig;
 
 import java.lang.reflect.Field;
 import java.util.HashMap;
@@ -81,7 +80,7 @@ public class ModConfigDataNeoForge extends ModConfigData {
         CULog.dbg("writeConfigFile invoked for " + this.configID + ", resetConfig: " + resetConfig);
         BUILDER.pop();
         ModConfigSpec CONFIG = BUILDER.build();
-        ConfigModNeoForge.container.registerConfig(ModConfig.Type.COMMON, CONFIG, saveFilePath + ".toml");
+        ConfigModNeoForge.container.registerConfig(ModConfig.Type.SYNCED, CONFIG, saveFilePath + ".toml");
     }
 
     /**
