@@ -16,6 +16,13 @@ tasks.named('wrapper', Wrapper).configure {
 version = mod_version
 group = maven_group
 
+// Loader outputs stay independent when the all-JAR script switches builds.
+layout.buildDirectory = layout.projectDirectory.dir('build/neoforge')
+tasks.withType(Jar).configureEach {
+    destinationDirectory = layout.projectDirectory.dir('build/libs')
+}
+
+
 repositories {
     mavenLocal()
     maven {
@@ -27,8 +34,13 @@ base {
     archivesName = "${mod_id}-neoforge"
 }
 
-// Mojang ships Java 21 to end users starting in 1.20.5, so mods should target Java 21.
+// Minecraft 26.3 and every build/runtime helper use Java 25.
 java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+tasks.withType(net.neoforged.nfrtgradle.NeoFormRuntimeTask).configureEach {
+    javaExecutable = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(25)
+    }.map { it.executablePath.asFile.absolutePath }
+}
 
 neoForge {
     // Specify the version of NeoForge to use.
@@ -74,6 +86,7 @@ neoForge {
 
         // applies to all the run configs above
         configureEach {
+            gameDirectory = project.file("run/neoforge")
             // Recommended logging data for a userdev environment
             // The markers can be added/remove as needed separated by commas.
             // "SCAN": For mods scan.

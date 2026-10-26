@@ -6,6 +6,13 @@ plugins {
 version = project.mod_version
 group = project.maven_group
 
+// Loader outputs stay independent when the all-JAR script switches builds.
+layout.buildDirectory = layout.projectDirectory.dir('build/fabric')
+tasks.withType(Jar).configureEach {
+    destinationDirectory = layout.projectDirectory.dir('build/libs')
+}
+
+
 repositories {
 	// Add repositories to retrieve artifacts from in here.
 	// You should only use this when depending on other mods because
@@ -57,6 +64,9 @@ dependencies {
 
 //If there's mixins
 loom {
+	// Keep the native client/common jars separate; no legacy class merger.
+	splitMinecraftJar()
+	runs.configureEach { runDir "run/fabric" }
 	accessWidenerPath = file("src/main/resources/coroutil.accesswidener")
 }
 
