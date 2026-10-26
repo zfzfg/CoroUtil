@@ -1,0 +1,16 @@
+name: CoroUtil
+version: '${project.version}'
+main: com.corosus.coroutil.paper.CoroUtilPaperPlugin
+api-version: '26.1'
+author: Corosus
+description: CoroUtil configuration manager and library for Paper / Purpur servers (Java 25)
+folia-supported: true
+commands:
+  coro:
+    description: CoroUtil configuration management
+    permission: coroutil.admin
+    usage: /<command> config common [reload|save|get|set]
+permissions:
+  coroutil.admin:
+    description: Permission to manage CoroUtil configurations
+    default: op

@@ -1,0 +1,13 @@
+# ==============================================================================
+# CoroUtil Paper / Purpur Server Configuration (Java 25)
+# ==============================================================================
+
+# General plugin settings
+logging:
+  log: true
+  debug: false
+  error: true
+
+# Config storage mode:
+# - toml: Saves configs in standard CoroUtil TOML format (100% compatible with Fabric / Forge)
+config-format: toml

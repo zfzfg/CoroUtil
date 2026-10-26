@@ -26,6 +26,10 @@ build.gradle
 eclipse
 run
 
+# maven
+target/
+jar/
+
 # java
 *.class
 *.war
